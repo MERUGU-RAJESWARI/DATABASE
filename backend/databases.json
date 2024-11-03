@@ -1,0 +1,23 @@
+[
+  {
+    "type": "mongodb",
+    "name": "kfhwo1",
+    "containerName": "mongodb-kfhwo1-1729946090756",
+    "username": "durga",
+    "password": "durga@2699"
+  },
+  {
+    "type": "mongodb",
+    "name": "63kilo",
+    "containerName": "mongodb-63kilo-1729946513012",
+    "username": "durga",
+    "password": "durga@2699"
+  },
+  {
+    "type": "mongodb",
+    "name": "durga",
+    "containerName": "mongodb-durga-1729946999160",
+    "username": "durga",
+    "password": "durga@2699"
+  }
+]

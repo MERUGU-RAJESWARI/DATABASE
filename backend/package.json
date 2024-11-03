@@ -1,0 +1,26 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-connection": "node src/services/test_connection.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mui/icons-material": "^6.1.5",
+    "child-process-promise": "^2.2.1",
+    "cors": "^2.8.5",
+    "dockerode": "^4.0.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "mongodb": "^6.10.0",
+    "mysql2": "^3.11.3",
+    "node-docker-api": "^1.1.22",
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}
