@@ -1,12 +1,16 @@
 import axios from 'axios';
+//API client for backend communication
 
-const API_URL = 'http://localhost:5000/api'; // Adjust this URL to match your backend
+const API_URL = 'http://localhost:5000/api'; 
 
 export const createDatabase = async (databaseData) => {
   try {
     const response = await axios.post(`${API_URL}/databases`, databaseData);
     return response.data;
   } catch (error) {
+    if (error.response && error.response.status === 401) {
+      throw new Error(error.response.data.error || 'Invalid credentials');
+    }
     console.error('Error creating database:', error);
     throw error;
   }

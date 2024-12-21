@@ -6,10 +6,14 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Typography ,
+  Typography,
   Grid,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import DockerContainerList from './DockerContainerList';
+
+ 
 
 function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
   const [dbType, setDbType] = useState('mongodb');
@@ -17,27 +21,44 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
   const [dbUsername, setDbUsername] = useState('');
   const [dbPassword, setDbPassword] = useState('');
   const [error, setError] = useState('');
+  const [showError, setShowError] = useState(false);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     
+   
+
     try {
-      const response = await onSubmit({ type: dbType, name: dbName, username: dbUsername, password: dbPassword });
-      // Handle successful creation
-    } catch (error) {
-      if (error.response?.status === 401) {
-        setError('Invalid username or password. Please use username: durga and password: durga@2699');
-      } else {
-        setError('An error occurred while creating the database. Please try again.');
-      }
+      await onSubmit({ type: dbType, name: dbName, username: dbUsername, password: dbPassword });
+      // Reset form on success
+      setDbName('');
+      setDbUsername('');
+      setDbPassword('');
+      setError('');
+    } catch (err) {
+      setError(err.message);
+      setShowError(true);
     }
+  };
+
+  const handleCloseError = () => {
+    setShowError(false);
   };
 
   return (
     <>
+      <Snackbar open={showError} autoHideDuration={6000} onClose={handleCloseError}>
+        <Alert onClose={handleCloseError} severity="error">
+          {error}
+        </Alert>
+      </Snackbar>
+
       <form onSubmit={handleSubmit}>
         <Grid container spacing={3}>
+          <Grid item xs={12}>
+           
+          </Grid>
+          
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth>
               <InputLabel id="db-type-label">Database Type</InputLabel>
@@ -50,6 +71,13 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
                 <MenuItem value="mongodb">MongoDB</MenuItem>
                 <MenuItem value="mysql">MySQL</MenuItem>
                 <MenuItem value="postgresql">PostgreSQL</MenuItem>
+               
+                <MenuItem value="Sqlite">Sqlite</MenuItem>
+                <MenuItem value="Redis">Redis</MenuItem>
+                <MenuItem value="MariaDB">MariaDB</MenuItem>
+                
+
+                
               </Select>
             </FormControl>
           </Grid>
@@ -60,15 +88,18 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
               variant="outlined"
               value={dbName}
               onChange={(e) => setDbName(e.target.value)}
+              required
             />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
               label="Username"
-              variant="outlined"
+           
               value={dbUsername}
               onChange={(e) => setDbUsername(e.target.value)}
+              required
+          
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -76,9 +107,11 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
               fullWidth
               label="Password"
               type="password"
-              variant="outlined"
+            
               value={dbPassword}
               onChange={(e) => setDbPassword(e.target.value)}
+              required
+             
             />
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -89,10 +122,10 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
               type="submit"
               disabled={loading || !dbName || !dbUsername || !dbPassword}
             >
-              Create Database
+              {loading ? 'Creating...' : 'Create Database'}
             </Button>
           </Grid>
-          <Grid item xs={12} sm={6}>
+          {/* <Grid item xs={12} sm={6}>
             <Button
               fullWidth
               variant="contained"
@@ -102,7 +135,7 @@ function DatabaseForm({ onSubmit, onRemove, loading, containers = [] }) {
             >
               Remove Database
             </Button>
-          </Grid>
+          </Grid> */}
         </Grid>
       </form>
       {containers && containers.length > 0 && (

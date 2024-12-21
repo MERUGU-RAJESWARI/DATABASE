@@ -1,12 +1,54 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Collapse, Box, Typography } from '@mui/material';
 
-function DockerContainerList({ containers }) {
+
+function DockerContainerList({ containers: initialContainers, onContainerDelete }) {
   const [open, setOpen] = React.useState({});
+  const [containers, setContainers] = React.useState(initialContainers);
+
+  // Add Docker container monitoring
+  useEffect(() => {
+    const checkDockerContainers = async () => {
+      try {
+        // Fetch current Docker containers
+        const response = await fetch('http://localhost:5000/api/docker/containers');
+        const activeContainers = await response.json();
+        
+        // Get container names/IDs from Docker
+        const activeContainerIds = activeContainers.map(c => c.Id);
+        const activeContainerNames = activeContainers.map(c => c.Names[0].replace('/', ''));
+
+        // Update UI state by filtering out containers that no longer exist in Docker
+        setContainers(prevContainers => 
+          prevContainers.filter(container => {
+            const containerExists = activeContainerNames.includes(container.name) || 
+                                  activeContainerIds.includes(container.containerId);
+            
+            // If container doesn't exist anymore, notify parent
+            if (!containerExists && onContainerDelete) {
+              onContainerDelete(container.name || container.containerName);
+            }
+            
+            return containerExists;
+          })
+        );
+      } catch (error) {
+        console.error('Error checking Docker containers:', error);
+      }
+    };
+
+    // Check immediately and then every 2 seconds
+    checkDockerContainers();
+    const interval = setInterval(checkDockerContainers, 2000);
+
+    return () => clearInterval(interval);
+  }, [onContainerDelete]);
 
   const handleClick = (containerName) => {
     setOpen(prev => ({ ...prev, [containerName]: !prev[containerName] }));
   };
+
+ 
 
   return (
     <TableContainer component={Paper}>
@@ -18,7 +60,7 @@ function DockerContainerList({ containers }) {
             <TableCell>Status</TableCell>
             <TableCell>Port(s)</TableCell>
             <TableCell>Created</TableCell>
-          
+           
           </TableRow>
         </TableHead>
         <TableBody>
@@ -30,6 +72,7 @@ function DockerContainerList({ containers }) {
                 <TableCell>{container.status || 'Running'}</TableCell>
                 <TableCell>{container.ports || '-'}</TableCell>
                 <TableCell>{container.created || 'Just now'}</TableCell>
+                
               </TableRow>
               <TableRow>
                 <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>

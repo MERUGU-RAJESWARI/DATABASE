@@ -2,13 +2,13 @@ const { MongoClient } = require('mongodb');
 const mysql = require('mysql2/promise');
 const dockerService = require('../services/dockerService');
 const { Client } = require('pg');
+const { exec } = require('child_process');
+const util = require('util');
+const Redis = require('ioredis');
+// const cassandra = require('cassandra-driver');
 
-const validateCredentials = (username, password) => {
-  const validUsername = 'durga';
-  const validPassword = 'durga@2699';
-  
-  return username === validUsername && password === validPassword;
-};
+// Create promisified version of exec
+const execPromise = util.promisify(exec);
 
 async function viewDatabaseInfo(connectionInfo) {
   try {
@@ -19,27 +19,74 @@ async function viewDatabaseInfo(connectionInfo) {
   }
 }
 
-exports.createDatabase = async (req, res) => {
-  const { type, name, username, password } = req.body;
-  
-  if (!validateCredentials(username, password)) {
-    return res.status(401).json({ 
-      error: 'Authentication failed: Invalid username or password. Please use the correct credentials.' 
-    });
-  }
+async function createRedisSample(connectionInfo) {
+  const redis = new Redis(connectionInfo.url);
   
   try {
+    // Set some sample key-value pairs
+    await redis.set('user:1:name', 'John Doe');
+    await redis.set('user:1:email', 'john@example.com');
+    await redis.set('user:1:created', new Date().toISOString());
+
+    // Get the sample data
+    const sampleData = {
+      name: await redis.get('user:1:name'),
+      email: await redis.get('user:1:email'),
+      created: await redis.get('user:1:created')
+    };
+
+    console.log('Sample data inserted in Redis');
+    return sampleData;
+  } catch (error) {
+    console.error('Error creating Redis sample:', error);
+    throw error;
+  } finally {
+    await redis.quit();
+    console.log('Closed Redis connection');
+  }
+}
+
+exports.createDatabase = async (req, res) => {
+  let { type, name, username, password } = req.body;
+  
+  console.log('Received request with type:', type);
+  
+  // Normalize the database type
+  type = type.toLowerCase().trim();
+  
+  console.log('Normalized type:', type);
+  
+  try {
+    console.log(`Creating database connection for type: ${type}, name: ${name}`);
     const connectionInfo = await dockerService.createDatabaseConnection(type, name, username, password);
     
     let sampleData;
-    if (type === 'mongodb') {
-      sampleData = await createMongoDBSample(connectionInfo);
-    } else if (type === 'mysql') {
-      sampleData = await createMySQLSample(connectionInfo);
-    } else if (type === 'postgresql') {
-      sampleData = await createPostgreSQLSample(connectionInfo);
-    } else {
-      throw new Error(`Unsupported database type: ${type}`);
+    
+    switch (type) {
+      case 'mongodb':
+        sampleData = await createMongoDBSample(connectionInfo);
+        break;
+      case 'mysql':
+        sampleData = await createMySQLSample(connectionInfo);
+        break;
+      case 'postgresql':
+      case 'postgres':
+        sampleData = await createPostgreSQLSample(connectionInfo);
+        break;
+      case 'sqlite':
+        sampleData = await createSQLiteSample(connectionInfo);
+        break;
+      case 'redis':
+        sampleData = await createRedisSample(connectionInfo);
+        break;
+      // case 'cassandra':
+      //   sampleData = await createCassandraSample(connectionInfo);
+      //   break;
+      case 'mariadb':
+        sampleData = await createMySQLSample(connectionInfo);
+        break;
+      default:
+        throw new Error(`Unsupported database type: ${type}. Supported types are: mysql, mongodb, postgresql, sqlite, redis, cassandra, mariadb`);
     }
     
     res.json({
@@ -48,26 +95,38 @@ exports.createDatabase = async (req, res) => {
     });
   } catch (error) {
     console.error('Error in createDatabase:', error);
-    res.status(500).json({ error: error.message, stack: error.stack });
+    res.status(500).json({ 
+      error: error.message,
+      receivedType: type,
+      validTypes: ['mongodb', 'mysql', 'postgresql', 'sqlite', 'redis', 'cassandra', 'mariadb']
+    });
   }
 };
 
 async function createMongoDBSample(connectionInfo) {
   const client = new MongoClient(connectionInfo.url);
+  
   try {
     await client.connect();
-    console.log('Connected to MongoDB');
     const db = client.db(connectionInfo.name);
-    const collection = db.collection('sample');
-    const result = await collection.insertOne({ name: 'durga', email: 'john@example.com' });
-    console.log('Sample data inserted');
+    const result = await db.collection('sample')
+      .insertOne({
+        name: 'Sample User',
+        email: 'sample@example.com',
+        createdAt: new Date()
+      });
+
+
+    console.log('Sample data inserted in MongoDB');
     
-    // Fetch the inserted document
-    const insertedDoc = await collection.findOne({ _id: result.insertedId });
-    return insertedDoc;
+    return {
+      data: await db.collection('sample').findOne({ _id: result.insertedId })
+    };
+  } catch (error) {
+    console.error('Error creating sample data:', error);
+    throw error;
   } finally {
     await client.close();
-    console.log('Closed MongoDB connection');
   }
 }
 
@@ -96,13 +155,14 @@ async function createMySQLSample(connectionInfo) {
 }
 
 async function createPostgreSQLSample(connectionInfo) {
-  const client = new Client(connectionInfo.url);
-  
+  const client = new Client({
+    connectionString: connectionInfo.url
+  });
+
   try {
     await client.connect();
     console.log('Connected to PostgreSQL');
-    
-    // Create users table
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -110,18 +170,51 @@ async function createPostgreSQLSample(connectionInfo) {
         email VARCHAR(255) NOT NULL
       )
     `);
-    
-    // Insert sample data
+
     const result = await client.query(
       'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *',
       ['John Doe', 'john@example.com']
     );
-    
-    console.log('Sample data inserted');
+
+    console.log('Sample data inserted in PostgreSQL');
     return result.rows[0];
+  } catch (error) {
+    console.error('Error creating PostgreSQL sample:', error);
+    throw error;
   } finally {
     await client.end();
     console.log('Closed PostgreSQL connection');
+  }
+}
+
+async function createSQLiteSample(connectionInfo) {
+  try {
+    // Execute SQLite commands in the container
+    await execPromise(`
+      docker exec ${connectionInfo.containerName} sh -c '
+        sqlite3 ${connectionInfo.url} "
+          CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL
+          );
+          INSERT INTO users (name, email) VALUES ('\''John Doe'\'', '\''john@example.com'\'');
+        "
+      '
+    `);
+
+    // Query the inserted data
+    const { stdout } = await execPromise(`
+      docker exec ${connectionInfo.containerName} sh -c '
+        sqlite3 ${connectionInfo.url} "SELECT * FROM users ORDER BY id DESC LIMIT 1;"
+      '
+    `);
+
+    console.log('Sample data inserted in SQLite');
+    return { data: stdout.trim() };
+  } catch (error) {
+    console.error('Error creating SQLite sample:', error);
+    throw error;
   }
 }
 
@@ -137,29 +230,13 @@ exports.removeDatabase = async (req, res) => {
   }
 };
 
-
-
-exports.getCollections = async (req, res) => {
-  const { containerName } = req.params;
-  
-  try {
-    // Get container connection info from existing container
-    const containerInfo = await dockerService.getContainerInfo(containerName);
-    const collections = await dockerService.getCollections(containerInfo);
-    
-    res.json(collections);
-  } catch (error) {
-    console.error('Error getting collections:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
 function handleErrorResponse(res, error) {
   if (error.message.includes('pull access denied')) {
-    res.status(500).json({ error: 'Failed to pull database image. Please check your internet connection or Docker Hub credentials.' });
+    res.status(500).json({ error: 'Failed to pull database image' });
   } else if (error.message.includes('docker: Error')) {
     res.status(500).json({ error: 'Docker error: ' + error.message });
   } else {
     res.status(500).json({ error: 'Failed to create database: ' + error.message });
   }
 }
+
