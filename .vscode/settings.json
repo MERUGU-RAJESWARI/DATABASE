@@ -1,3 +1,4 @@
 {
-    "testCoveragePRValidator.coverage": 64
+    "testCoveragePRValidator.coverage": 64,
+    "testCoverageCommitValidator.coverage": 67
 }
