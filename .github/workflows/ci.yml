@@ -1,0 +1,33 @@
+name: Test Coverage Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  coverage-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests with coverage
+        run: npm test -- --coverage
+
+      - name: Fail if coverage is too low
+        run: |
+          COVERAGE=$(npx jest --coverage | grep -Eo 'All files.*[0-9]+%' | awk '{print $NF}')
+          THRESHOLD=80%
+          if [[ "$COVERAGE" < "$THRESHOLD" ]]; then
+            echo "Coverage is below threshold ($COVERAGE < $THRESHOLD)."
+            exit 1
+          fi

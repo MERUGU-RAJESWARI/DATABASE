@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "Running test coverage check before pushing..."
+
+npm test -- --coverage > coverage.txt
+
+COVERAGE=$(grep -Eo 'All files.*[0-9]+%' coverage.txt | awk '{print $NF}' | tr -d '%')
+
+THRESHOLD=80
+
+if [ "$COVERAGE" -lt "$THRESHOLD" ]; then
+  echo "🚨 Test coverage is too low: ${COVERAGE}% (Threshold: ${THRESHOLD}%)"
+  exit 1  # Block push
+else
+  echo "✅ Test coverage passed: ${COVERAGE}%"
+fi
