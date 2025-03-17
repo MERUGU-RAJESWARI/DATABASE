@@ -1,4 +1,3 @@
-//kcnnrajeswari
 const { MongoClient } = require('mongodb');
 const mysql = require('mysql2/promise');
 const dockerService = require('../services/dockerService');
